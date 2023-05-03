@@ -69,14 +69,50 @@ class Movie(db.Model):
 #     add_movie()
 
 
+# ------------------------- FORMS ------------------------- #
+# created MovieForm class
+class MovieForm(FlaskForm):
+    rating = StringField(label='Your rating out of 10 e.g. 7.5', validators=[DataRequired()])
+    review = StringField(label='Your review', validators=[DataRequired()])
+    submit = SubmitField(label='Done')
+
+
+
 # ------------------------- ROUTES ------------------------- #
-# route decorator to tell Flask what URL should trigger the function
+# route decorator to tell Flask to run the function below when the '/' page is requested
 @app.route("/")
 def home():
     all_movies = Movie.query.order_by(Movie.rating).all()
     return render_template("index.html", movies=all_movies)
 
+# route decorator to tell Flask to run the function below when the '/edit' page is requested
+@app.route('/edit', methods=["GET", "POST"])
+def edit():
+    form = MovieForm()
+    movie_id = request.args.get('id')
+    movie = Movie.query.get(movie_id)
+    if form.validate_on_submit():
+        movie.rating = float(form.rating.data)
+        movie.review = form.review.data
+        db.session.commit()
+        return redirect(url_for('home'))
+    return render_template('edit.html', movie=movie, form=form)
 
+# route decorator to tell Flask to run the function below when the '/delete' page is requested
+@app.route('/delete')
+def delete():
+    if request.method == 'POST':
+        pass
+    return redirect(url_for('home'))
+
+# route decorator to tell Flask to run the function below when the '/select' page is requested
+@app.route('/select', methods=["GET", "POST"])
+def select():
+    if request.method == 'POST':
+        pass
+    return render_template('select.html')
+
+# route decorator to tell Flask to run the function below when the '/add' page is requested
 @app.route("/add", methods=["GET", "POST"])
 def add():
     if request.method == 'POST':
