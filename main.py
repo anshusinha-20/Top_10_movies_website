@@ -101,8 +101,10 @@ def edit():
 # route decorator to tell Flask to run the function below when the '/delete' page is requested
 @app.route('/delete')
 def delete():
-    if request.method == 'POST':
-        pass
+    movie_id = request.args.get('id')
+    movie = Movie.query.get(movie_id)
+    db.session.delete(movie)
+    db.session.commit()
     return redirect(url_for('home'))
 
 # route decorator to tell Flask to run the function below when the '/select' page is requested
