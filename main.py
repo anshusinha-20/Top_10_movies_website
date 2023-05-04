@@ -41,41 +41,40 @@ class Movie(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(250), unique=True, nullable=False)
     year = db.Column(db.Integer, nullable=False)
-    description = db.Column(db.String(250))
-    rating = db.Column(db.Float, nullable=False)
-    ranking = db.Column(db.Integer, nullable=False)
-    review = db.Column(db.String(250))
+    description = db.Column(db.String(250), nullable=False)
+    rating = db.Column(db.Float, nullable=True)
+    ranking = db.Column(db.Integer, nullable=True)
+    review = db.Column(db.String(250), nullable=True)
     img_url = db.Column(db.String(250), nullable=False)
 
     def __repr__(self):
         return f'<Movie {self.title}>'
 
-# with app.app_context():
-#     db.create_all()
-
-#     def add_movie():
-#         new_movie = Movie(title='Phone Booth',
-#                            year=2002,
-#                            description='Publicist Stuart Shepard finds himself trapped in a phone booth, pinned down by an extortionist\'s sniper rifle. Unable to leave or receive outside help, Stuart\'s negotiation with the caller leads to a jaw-dropping climax.',
-#                            rating=7.3,
-#                            ranking=10,
-#                            review='One of the best movies I\'ve ever seen!',
-#                            img_url='https://image.tmdb.org/t/p/w500/tjrX2oWRCM3Tvarz38zlZM7Uc10.jpg'
-#                            )
-
-#         db.session.add(new_movie)
-#         db.session.commit()
-
-#     add_movie()
+with app.app_context():
+    db.create_all()
 
 
 # ------------------------- FORMS ------------------------- #
-# created MovieForm class
-class MovieForm(FlaskForm):
+# created Rate_Movie_Form class
+class Rate_Movie_Form(FlaskForm):
     rating = StringField(label='Your rating out of 10 e.g. 7.5', validators=[DataRequired()])
     review = StringField(label='Your review', validators=[DataRequired()])
     submit = SubmitField(label='Done')
 
+# created Add_Movie_Form class
+class Add_Movie_Form(FlaskForm):
+    title = StringField(label='Movie title', validators=[DataRequired()])
+    submit = SubmitField(label='Add movie')
+
+
+# ------------------------- API ------------------------- #
+# created API_KEY variable
+API_KEY = 'your api key'
+
+# created API_URL variables
+MOVIE_SEARCH_URL = "https://api.themoviedb.org/3/search/movie"
+MOVIE_INFO_URL = "https://api.themoviedb.org/3/movie"
+MOVIE_IMAGE_URL = "https://image.tmdb.org/t/p/w500"
 
 
 # ------------------------- ROUTES ------------------------- #
@@ -83,12 +82,13 @@ class MovieForm(FlaskForm):
 @app.route("/")
 def home():
     all_movies = Movie.query.order_by(Movie.rating).all()
+    db.session.commit()
     return render_template("index.html", movies=all_movies)
 
 # route decorator to tell Flask to run the function below when the '/edit' page is requested
 @app.route('/edit', methods=["GET", "POST"])
 def edit():
-    form = MovieForm()
+    form = Rate_Movie_Form()
     movie_id = request.args.get('id')
     movie = Movie.query.get(movie_id)
     if form.validate_on_submit():
@@ -107,19 +107,58 @@ def delete():
     db.session.commit()
     return redirect(url_for('home'))
 
-# route decorator to tell Flask to run the function below when the '/select' page is requested
-@app.route('/select', methods=["GET", "POST"])
-def select():
-    if request.method == 'POST':
-        pass
-    return render_template('select.html')
-
 # route decorator to tell Flask to run the function below when the '/add' page is requested
 @app.route("/add", methods=["GET", "POST"])
 def add():
-    if request.method == 'POST':
-        pass
+    form = Add_Movie_Form()
+    if form.validate_on_submit():
+        movie = form.title.data
+        # created parameters dictionary
+        parameters = {
+            'api_key': API_KEY,
+            'query': movie
+        }
 
+        # created response variable
+        response = requests.get(url=MOVIE_SEARCH_URL, params=parameters)
+        response.raise_for_status()
+
+        # created movies variable
+        movies = response.json()['results']
+
+        return render_template('select.html', movies=movies)
+    return render_template('add.html', form=form)
+
+# route decorator to tell Flask to run the function below when the '/find' page is requested
+@app.route('/find')
+def find():
+    movie_id = request.args.get('id')
+    if movie_id:
+        # created parameters dictionary
+        parameters = {
+            'api_key': API_KEY,
+            'language': 'en-US'
+        }
+
+        # created response variable
+        response = requests.get(url=f'{MOVIE_INFO_URL}/{movie_id}', params=parameters)
+        response.raise_for_status()
+
+        # created data variable
+        data = response.json()
+
+        # created new_movie variable
+        new_movie = Movie(
+            title=data['title'],
+            year=data['release_date'].split('-')[0],
+            img_url=f'{MOVIE_IMAGE_URL}/{data["poster_path"]}',
+            description=data['overview']
+        )
+
+        db.session.add(new_movie)
+        db.session.commit()
+        return redirect(url_for('edit', id=new_movie.id))
+    
 
 # ------------------------- MAIN ------------------------- #
 # checks if name is equal to main and runs the app
